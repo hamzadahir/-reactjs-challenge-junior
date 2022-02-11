@@ -78,11 +78,54 @@ BalanceOutput.propTypes = {
 export default connect(state => {
   let balance = [];
 
+  const isValidDate = (d) => {
+    return d instanceof Date && !isNaN(d);
+  }
+
   /* YOUR CODE GOES HERE */
+  if (state.accounts.length > 0 && state.journalEntries.length > 0) {
+
+    const accounts = state.accounts;
+
+    // get sum DEBIT and CREDIT
+    const journalEntries = Object.values(state.journalEntries.reduce((result, {ACCOUNT, PERIOD, DEBIT, CREDIT}) => {
+      let current = (result[ACCOUNT] || (result[ACCOUNT] = {
+        ACCOUNT, PERIOD, DEBITSum: 0, CREDITSum: 0,
+      }));
+
+      current.DEBITSum += DEBIT;
+      current.CREDITSum += CREDIT;
+      return result;
+    }, {}));
+
+    balance = accounts.map((item, i) => Object.assign({}, item, journalEntries[i]));
+
+    // Replace names
+    balance = balance.map(elm => ({
+      ACCOUNT: elm.ACCOUNT,
+      DESCRIPTION: elm['LABEL'],
+      PERIOD: elm.PERIOD,
+      DEBIT: elm.DEBITSum ? elm.DEBITSum : 0,
+      CREDIT: elm.CREDITSum ? elm.CREDITSum : 0,
+      BALANCE: (elm.DEBITSum ? elm.DEBITSum : 0) - (elm.CREDITSum ? elm.CREDITSum : 0)
+    }));
+
+    const startAccount = state.userInput.startAccount ? state.userInput.startAccount : 0
+    const endAccount = state.userInput.endAccount ? state.userInput.endAccount : 0;
+    const startPeriod = isValidDate(state.userInput.startPeriod) ? state.userInput.startPeriod : 0;
+    const endPeriod = isValidDate(state.userInput.endPeriod) ? state.userInput.endPeriod : 0;
+
+    // filter by accounts
+    balance = balance
+      .filter(item => ((startAccount ? item.ACCOUNT >= startAccount : true) && (endAccount ? item.ACCOUNT <= endAccount : true)));
+
+    // filter by period
+    balance = balance
+      .filter(item => ((startPeriod ? (item.PERIOD >= startPeriod) : true) && (endPeriod ? item.PERIOD <= endPeriod : true)));
+  }
 
   const totalCredit = balance.reduce((acc, entry) => acc + entry.CREDIT, 0);
   const totalDebit = balance.reduce((acc, entry) => acc + entry.DEBIT, 0);
-
   return {
     balance,
     totalCredit,
